@@ -720,7 +720,7 @@ function dogWalk() {
       const i = Math.floor((now - t0) / 1000 * S.fps);
       if (i >= S.frames) { canvas.style.transform = ''; sit(); return; }
       const k0 = Math.min(1, (now - t0) / 1000 * S.fps / S.walkEnd);
-      canvas.style.transform = k0 < 1 ? `translateX(${(start * (1 - k0)).toFixed(1)}px)` : '';
+      // (no extra sliding: the dog only moves as it walks in the film)
       const k = i % per, im = imgs[Math.floor(i / per)];
       ctx.clearRect(0, 0, S.w, S.h);
       ctx.drawImage(im, (k % S.cols) * S.w, Math.floor(k / S.cols) * S.h, S.w, S.h, 0, 0, S.w, S.h);
