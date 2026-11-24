@@ -150,7 +150,7 @@ main {
 /* The dog walks in and sits down (frames from a generated film, played by the
    page: see dogWalk). The box is the size of the sitting dog; the stage with
    the walk is wider and reaches out to the right of it. */
-.home { overflow-x: clip; }
+html, body { overflow-x: clip; }   /* the dog walks in from beyond the right edge of the window */
 .home-dog.dog-walk-box { position: relative; aspect-ratio: 434.07 / 391.4; }
 .dog-stage { position: absolute; left: -17.663%; top: -4.770%; width: 229.23%; aspect-ratio: 995 / 415; pointer-events: none; }
 .dog-stage canvas, .dog-stage svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; overflow: visible; }
@@ -674,7 +674,7 @@ function renderDog(alt = COPY.dogAlt) {
    The sitting dog it ends on is a still (media/piesek-siedzi.webp) with Jana's
    original head; the tongue, the lid and the pupils sit on it, placed with
    DOG_STAGE.grid (the same 1357 x 1072 grid as the dog above). */
-const DOG_STAGE = { w: 995, h: 415, frames: 121, cols: 4, rows: 5, sheets: 7, fps: 24,
+const DOG_STAGE = { walkFrom: 489, walkEnd: 56, w: 995, h: 415, frames: 121, cols: 4, rows: 5, sheets: 7, fps: 24,
   still: [76.67, 18.67, 434.07, 391.4], grid: [0.265595, 39.599, -10.698] };
 function renderWalkingDog(alt = COPY.dogAlt) {
   const S = DOG_STAGE, [x, y, w, h] = S.still;
@@ -696,11 +696,18 @@ function dogWalk() {
   const play = () => {
     if (failed || !stage.isConnected) { sit(); return; }
     const per = S.cols * S.rows; let t0 = null;
+    // the film starts with the dog already in view; push it out past the right
+    // edge of the window and bring it in while it walks (frames 0..S.walkEnd)
+    const r = canvas.getBoundingClientRect();
+    const dogLeft = r.left + S.walkFrom / S.w * r.width;
+    const start = Math.max(0, document.documentElement.clientWidth - dogLeft + 8);
     const tick = now => {
       if (!stage.isConnected) return;
       if (t0 === null) t0 = now;
       const i = Math.floor((now - t0) / 1000 * S.fps);
-      if (i >= S.frames) { sit(); return; }
+      if (i >= S.frames) { canvas.style.transform = ''; sit(); return; }
+      const k0 = Math.min(1, (now - t0) / 1000 * S.fps / S.walkEnd);
+      canvas.style.transform = k0 < 1 ? `translateX(${(start * (1 - k0)).toFixed(1)}px)` : '';
       const k = i % per, im = imgs[Math.floor(i / per)];
       ctx.clearRect(0, 0, S.w, S.h);
       ctx.drawImage(im, (k % S.cols) * S.w, Math.floor(k / S.cols) * S.h, S.w, S.h, 0, 0, S.w, S.h);
