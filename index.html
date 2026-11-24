@@ -151,6 +151,16 @@ main {
    page: see dogWalk). The box is the size of the sitting dog; the stage with
    the walk is wider and reaches out to the right of it. */
 html, body { overflow-x: clip; }   /* the dog walks in from beyond the right edge of the window */
+/* phone: the dog comes right under the headline, so it is seen walking in */
+@media (max-width: 47.99rem) {
+  .home-hero { gap: 0; }
+  .home-copy { display: contents; }
+  .home-title { order: 1; }
+  .home-sub { order: 2; font-size: 1.55rem; }
+  .home-dog.dog-walk-box { order: 3; width: min(66%, 17rem); justify-self: center; margin: 1.5rem 0 .25rem; }
+  .home-text { order: 4; font-size: 1rem; line-height: 1.5; margin-top: 1.25rem; }
+  .home-buy { order: 5; margin-top: 1.5rem; }
+}
 .home-dog.dog-walk-box { position: relative; aspect-ratio: 434.07 / 391.4; }
 .dog-stage { position: absolute; left: -17.663%; top: -4.770%; width: 229.23%; aspect-ratio: 995 / 415; pointer-events: none; }
 .dog-stage canvas, .dog-stage svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; overflow: visible; }
@@ -695,6 +705,13 @@ function dogWalk() {
   const imgs = []; let failed = false;
   const play = () => {
     if (failed || !stage.isConnected) { sit(); return; }
+    if (!stage.dataset.seen) {
+      const io = new IntersectionObserver(es => {
+        if (es.some(e => e.isIntersecting)) { io.disconnect(); stage.dataset.seen = '1'; play(); }
+      }, { threshold: 0.6 });
+      io.observe(stage.parentElement);
+      return;
+    }
     const per = S.cols * S.rows; let t0 = null;
     // the film starts with the dog already in view; push it out past the right
     // edge of the window and bring it in while it walks (frames 0..S.walkEnd)
@@ -948,7 +965,7 @@ const views = {
     return `
     <section class="home">
       <div class="home-hero">
-        <div>
+        <div class="home-copy">
           <h1 class="home-title" tabindex="-1"><span class="sr-only">Fix your attitude</span><img class="fur-film" src="media/fix-your-attitude-fur.png" alt=""></h1>
           <p class="home-sub">Brand Personality Test</p>
           <p class="home-text">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque sed eros vel orci congue mollis. Pellentesque mollis est at velit tempor, vel viverra libero blandit. Phasellus bibendum dictum condimentum. Mauris ut auctor felis.</p>
