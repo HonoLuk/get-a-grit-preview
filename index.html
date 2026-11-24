@@ -147,6 +147,18 @@ main {
 .home-price { font-family: var(--font-display); font-weight: 900; font-size: clamp(1.6rem, 2.6vw, 3rem); line-height: 1; }
 .home-dog { width: min(78%, 20rem); justify-self: end; }
 
+/* The dog walks in and sits down (frames from a generated film, played by the
+   page: see dogWalk). The box is the size of the sitting dog; the stage with
+   the walk is wider and reaches out to the right of it. */
+.home { overflow-x: clip; }
+.home-dog.dog-walk-box { position: relative; aspect-ratio: 434.07 / 391.4; }
+.dog-stage { position: absolute; left: -17.663%; top: -4.770%; width: 229.23%; aspect-ratio: 995 / 415; pointer-events: none; }
+.dog-stage canvas, .dog-stage svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; overflow: visible; }
+.dog-stage svg { pointer-events: auto; }
+.dog-stage .dog-sit { opacity: 0; }
+.dog-stage.is-sitting .dog-sit { opacity: 1; }
+.dog-stage.is-sitting canvas { visibility: hidden; }
+
 /* the glints in the dog's eyes follow the pointer (see the pointermove handler) */
 .dog-gaze { transition: transform .12s ease-out; }
 
@@ -155,7 +167,7 @@ main {
 /* the title is a looping 3D film (made in Blender, see media/); the film has
    .3em of empty room around the letters, taken back here with the margin */
 .fur-film { display: block; width: 5.594em; max-width: none; aspect-ratio: 1400 / 508; margin: -.3em; pointer-events: none; }
-.home-dog .dog { animation: dog-float 6s ease-in-out infinite; }
+.home-dog > .dog { animation: dog-float 6s ease-in-out infinite; }
 @keyframes dog-float {
   0%, 100% { transform: translateY(0) rotate(0deg); }
   50% { transform: translateY(-1.6%) rotate(-1deg); }
@@ -248,7 +260,8 @@ body[data-view="test"] main { padding-bottom: 6rem; }
   .answer:first-child { border-left: 0; }
 }
 @media (min-width: 48rem) {
-  .home-hero { grid-template-columns: auto auto; justify-content: center; align-items: center; gap: 1.2vw; }
+  .home-hero { grid-template-columns: auto auto; justify-content: center; align-items: center; gap: 1.2vw; padding-left: 4vw; }
+  .home-dog.dog-walk-box { margin-left: 3vw; }
   .home-title { font-size: clamp(2.6rem, 7.6vw, 9rem); }
   .home-dog { width: clamp(15rem, 27.1vw, 32.5rem); justify-self: auto; }
 }
@@ -655,6 +668,58 @@ function renderDog(alt = COPY.dogAlt) {
   </svg>`;
 }
 
+/* The home dog: walks in, sits down, then shows its tongue and winks.
+   The walk is a film (made with Kling from Jana's dog, her face pasted in
+   unchanged), played frame by frame from media/piesek-wejscie-1..7.webp.
+   The sitting dog it ends on is a still (media/piesek-siedzi.webp) with Jana's
+   original head; the tongue, the lid and the pupils sit on it, placed with
+   DOG_STAGE.grid (the same 1357 x 1072 grid as the dog above). */
+const DOG_STAGE = { w: 995, h: 415, frames: 121, cols: 4, rows: 5, sheets: 7, fps: 24,
+  still: [76.67, 18.67, 434.07, 391.4], grid: [0.265595, 39.599, -10.698] };
+function renderWalkingDog(alt = COPY.dogAlt) {
+  const S = DOG_STAGE, [x, y, w, h] = S.still;
+  return `
+  <div class="dog-stage">
+    <canvas width="${S.w}" height="${S.h}" aria-hidden="true"></canvas>
+    <svg class="dog dog-sit" viewBox="0 0 ${S.w} ${S.h}" role="img" aria-label="${esc(alt)}">
+      <image href="media/piesek-siedzi.webp" x="${x}" y="${y}" width="${w}" height="${h}"/>
+    </svg>
+  </div>`;
+}
+function dogWalk() {
+  const stage = main.querySelector('.dog-stage');
+  if (!stage) return;
+  const sit = () => stage.classList.add('is-sitting');
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { sit(); return; }
+  const S = DOG_STAGE, canvas = stage.querySelector('canvas'), ctx = canvas.getContext('2d');
+  const imgs = []; let failed = false;
+  const play = () => {
+    if (failed || !stage.isConnected) { sit(); return; }
+    const per = S.cols * S.rows; let t0 = null;
+    const tick = now => {
+      if (!stage.isConnected) return;
+      if (t0 === null) t0 = now;
+      const i = Math.floor((now - t0) / 1000 * S.fps);
+      if (i >= S.frames) { sit(); return; }
+      const k = i % per, im = imgs[Math.floor(i / per)];
+      ctx.clearRect(0, 0, S.w, S.h);
+      ctx.drawImage(im, (k % S.cols) * S.w, Math.floor(k / S.cols) * S.h, S.w, S.h, 0, 0, S.w, S.h);
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  };
+  for (let n = 1; n <= S.sheets; n++) {
+    const im = new Image();
+    im.src = `media/piesek-wejscie-${n}.webp`;
+    imgs.push(im);
+  }
+  Promise.all(imgs.map(im => im.decode())).then(() => {
+    imgs.forEach(im => ctx.drawImage(im, 0, 0, 1, 1, 0, 0, 1, 1));   // warm up each sheet once
+    ctx.clearRect(0, 0, S.w, S.h);
+    play();
+  }, () => { failed = true; sit(); });
+}
+
 /* The result dog: Jana's dog (as she drew it, in the hoodie) wearing the
    accessories of the given traits. Nothing on the dog itself is redrawn. */
 function renderResultDog(traitIds, alt) {
@@ -696,10 +761,11 @@ const GAZE = { x: 11, y: 7 };
 function dogLook(px, py) {
   const gaze = document.querySelector('.home-dog .dog-gaze');
   if (!gaze || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const r = gaze.ownerSVGElement.getBoundingClientRect();
-  const ex = r.left + (537 - 150) / 1272 * r.width, ey = r.top + (410 - 120) / 955 * r.height; // between the eyes
+  const r = gaze.getBoundingClientRect();
+  if (!r.width) return;
+  const ex = r.left + r.width / 2, ey = r.top + r.height / 2; // between the eyes
   const dx = px - ex, dy = py - ey, d = Math.hypot(dx, dy) || 1;
-  const k = Math.min(1, d / (r.width * 0.5)) / d;
+  const k = Math.min(1, d / (r.width * 4)) / d;
   gaze.style.transform = `translate(${(dx * k * GAZE.x).toFixed(1)}px, ${(dy * k * GAZE.y).toFixed(1)}px)`;
 }
 window.addEventListener('pointerleave', () => { furPointer.x = furPointer.y = -9999; });
@@ -881,7 +947,7 @@ const views = {
           <p class="home-text">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque sed eros vel orci congue mollis. Pellentesque mollis est at velit tempor, vel viverra libero blandit. Phasellus bibendum dictum condimentum. Mauris ut auctor felis.</p>
           <p class="home-buy"><span class="home-price">$5.00</span><button class="btn" type="button" data-start>BUY TEST</button></p>
         </div>
-        <div class="home-dog">${renderDog()}</div>
+        <div class="home-dog dog-walk-box">${renderWalkingDog()}</div>
       </div>
     </section>`;
   },
@@ -985,6 +1051,7 @@ function paint(moveFocus) {
   });
   main.innerHTML = views[name]();
   startFur();
+  dogWalk();
   if (moveFocus) {
     window.scrollTo(0, 0);
     const h = main.querySelector('h1');
