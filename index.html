@@ -705,13 +705,9 @@ function dogWalk() {
   const imgs = []; let failed = false;
   const play = () => {
     if (failed || !stage.isConnected) { sit(); return; }
-    if (!stage.dataset.seen) {
-      const io = new IntersectionObserver(es => {
-        if (es.some(e => e.isIntersecting)) { io.disconnect(); stage.dataset.seen = '1'; play(); }
-      }, { threshold: 0.6 });
-      io.observe(stage.parentElement);
-      return;
-    }
+    // wait until the dog's place is on screen (on a phone it is below the headline)
+    const box = stage.parentElement.getBoundingClientRect();
+    if (box.top + box.height * 0.6 > window.innerHeight) { setTimeout(play, 250); return; }   // check again shortly (the layout may still be settling, or the visitor will scroll)
     const per = S.cols * S.rows; let t0 = null;
     // the film starts with the dog already in view; push it out past the right
     // edge of the window and bring it in while it walks (frames 0..S.walkEnd)
@@ -737,7 +733,13 @@ function dogWalk() {
     im.src = `media/piesek-wejscie-${n}.webp`;
     imgs.push(im);
   }
-  Promise.all(imgs.map(im => im.decode())).then(() => {
+  // wait for every sheet to load and (where the browser allows) to decode, but
+  // never longer than 1.5 s for the decoding, so the dog always comes in
+  const ready = im => new Promise((ok, bad) => {
+    const go = () => Promise.race([im.decode().catch(() => {}), new Promise(r => setTimeout(r, 1500))]).then(ok);
+    if (im.complete && im.naturalWidth) go(); else { im.onload = go; im.onerror = bad; }
+  });
+  Promise.all(imgs.map(ready)).then(() => {
     imgs.forEach(im => ctx.drawImage(im, 0, 0, 1, 1, 0, 0, 1, 1));   // warm up each sheet once
     ctx.clearRect(0, 0, S.w, S.h);
     play();
